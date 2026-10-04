@@ -2,15 +2,15 @@ from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import httpx
-import pytest
-from sqlalchemy import select
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from app.agents.research import ResearchAgent, ResearchInput
-from app.database import SessionLocal
+from app.database import Base
 from app.ingestion.gdelt import NewsResult
 from app.ingestion.service import IngestResult
-from app.models import Account
-from app.retrieval.lancedb_store import LanceStore, RetrievedChunk
+from app.models import Account, Document, Source, SourceType
+from app.retrieval.lancedb_store import RetrievedChunk
 
 
 ACCOUNT_ID = "11111111-1111-1111-1111-111111111111"
@@ -513,7 +513,7 @@ def test_search_failure_without_fallback_evidence_returns_failed() -> None:
     assert "GDELT unavailable" in result.research_gaps[0]
 
 
-def test_real_lancedb_schneider_fallback_without_gdelt() -> None:
+def test_fallback_with_deterministic_database_and_retriever() -> None:
     def failing_searcher(*args: object, **kwargs: object) -> list[NewsResult]:
         response = httpx.Response(
             429,
@@ -525,24 +525,153 @@ def test_real_lancedb_schneider_fallback_without_gdelt() -> None:
             response=response,
         )
 
-    with SessionLocal() as db:
-        account = db.scalar(
-            select(Account).where(Account.name == "Schneider Electric")
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+
+    account_id = UUID(ACCOUNT_ID)
+    press_source_id = uuid4()
+    annual_source_id = uuid4()
+    press_document_id = uuid4()
+    annual_document_id = uuid4()
+
+    with Session(engine) as db:
+        db.add(
+            Account(
+                id=account_id,
+                name="Schneider Electric",
+                industry="Manufacturing",
+                market="India",
+            )
         )
-        if account is None:
-            pytest.skip("Schneider Electric seed account is not available")
+        db.add_all(
+            [
+                Source(
+                    id=press_source_id,
+                    account_id=account_id,
+                    source_type=SourceType.PRESS_RELEASE,
+                    title="Battery Energy Storage System",
+                    url="https://example.com/press-releases/battery-storage",
+                ),
+                Source(
+                    id=annual_source_id,
+                    account_id=account_id,
+                    source_type=SourceType.ANNUAL_REPORT,
+                    title="2025 Full Year Financial results",
+                    url="https://example.com/reports/annual-report-2025.pdf",
+                ),
+                Document(
+                    id=press_document_id,
+                    source_id=press_source_id,
+                    account_id=account_id,
+                    title="Battery Energy Storage System",
+                    content="Battery energy storage system evidence.",
+                    document_type="text/html",
+                ),
+                Document(
+                    id=annual_document_id,
+                    source_id=annual_source_id,
+                    account_id=account_id,
+                    title="2025 Full Year Financial results",
+                    content="Annual report evidence.",
+                    document_type="application/pdf",
+                ),
+            ]
+        )
+        db.commit()
+
+        def retriever(
+            query: str,
+            account_id: str,
+            top_k: int,
+        ) -> list[RetrievedChunk]:
+            assert query == (
+                "Schneider Electric Manufacturing India "
+                "recent digital transformation and technology developments"
+            )
+            assert account_id == ACCOUNT_ID
+            assert top_k == 10
+            return [
+                RetrievedChunk(
+                    chunk_id="press-1",
+                    account_id=ACCOUNT_ID,
+                    document_id=str(press_document_id),
+                    text="Battery energy storage system press release evidence.",
+                    source_id=str(press_source_id),
+                    title="Schneider Electric Unveils Next-Generation Battery Energy Storage System",
+                    source_type="PRESS_RELEASE",
+                    document_type="text/html",
+                    published_at=datetime(2026, 5, 10, tzinfo=timezone.utc),
+                    retrieved_at=None,
+                    distance=0.1,
+                    semantic_score=0.9,
+                    recency_score=0.8,
+                    source_score=0.95,
+                    combined_score=1.1,
+                ),
+                RetrievedChunk(
+                    chunk_id="annual-1",
+                    account_id=ACCOUNT_ID,
+                    document_id=str(annual_document_id),
+                    text="2025 full year financial results and annual report evidence.",
+                    source_id=str(annual_source_id),
+                    title="2025 Full Year Financial results",
+                    source_type="ANNUAL_REPORT",
+                    document_type="application/pdf",
+                    published_at=datetime(2026, 2, 25, tzinfo=timezone.utc),
+                    retrieved_at=None,
+                    distance=0.2,
+                    semantic_score=0.8,
+                    recency_score=0.6,
+                    source_score=1.0,
+                    combined_score=1.0,
+                ),
+                RetrievedChunk(
+                    chunk_id="generic-1",
+                    account_id=ACCOUNT_ID,
+                    document_id="generic-document",
+                    text="Find what you need. Search products and support.",
+                    source_id="generic-source",
+                    title="Find what you need | Schneider Electric India",
+                    source_type="PRESS_RELEASE",
+                    document_type="text/html",
+                    published_at=None,
+                    retrieved_at=None,
+                    distance=0.05,
+                    semantic_score=0.95,
+                    recency_score=0.0,
+                    source_score=0.95,
+                    combined_score=1.2,
+                ),
+                RetrievedChunk(
+                    chunk_id="generic-2",
+                    account_id=ACCOUNT_ID,
+                    document_id="generic-document",
+                    text="Find what you need. Search products and support.",
+                    source_id="generic-source",
+                    title="Find what you need | Schneider Electric India",
+                    source_type="PRESS_RELEASE",
+                    document_type="text/html",
+                    published_at=None,
+                    retrieved_at=None,
+                    distance=0.06,
+                    semantic_score=0.94,
+                    recency_score=0.0,
+                    source_score=0.95,
+                    combined_score=1.19,
+                ),
+            ]
 
         result = ResearchAgent(
             db=db,
-            lance_store=LanceStore(),
             searcher=failing_searcher,
+            retriever=retriever,
             max_records=10,
         ).run(
             ResearchInput(
-                account_id=str(account.id),
-                account_name=account.name,
-                industry=account.industry,
-                market=account.market,
+                account_id=ACCOUNT_ID,
+                account_name="Schneider Electric",
+                industry="Manufacturing",
+                market="India",
                 research_request=(
                     "recent digital transformation and technology developments"
                 ),
@@ -554,7 +683,10 @@ def test_real_lancedb_schneider_fallback_without_gdelt() -> None:
         "Approved-source search failed" in gap
         for gap in result.research_gaps
     )
-    assert result.documents_added
+    assert [
+        document.document_id
+        for document in result.documents_added
+    ] == [str(press_document_id), str(annual_document_id)]
     assert all(document.url for document in result.documents_added)
     assert all(document.relevant for document in result.documents_added)
     assert len({document.document_id for document in result.documents_added}) == len(
