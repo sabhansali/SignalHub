@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     hubspot_access_token: str | None = None
     llm_api_key: str | None = None
     llm_model: str | None = None
+    llm_base_url: str = "https://api.openai.com/v1/chat/completions"
+    gemini_api_key: str | None = None
+    gemini_model: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
