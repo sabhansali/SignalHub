@@ -184,8 +184,8 @@ docs/
 ### 1. Clone the repository
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
-cd signalhub
+git clone https://github.com/sabhansali/SignalHub.git
+cd SignalHub
 ```
 
 ### 2. Create and activate a virtual environment
