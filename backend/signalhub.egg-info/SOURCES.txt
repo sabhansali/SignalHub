@@ -5,6 +5,7 @@ backend/app/config.py
 backend/app/database.py
 backend/app/main.py
 backend/app/agents/graph.py
+backend/app/agents/research.py
 backend/app/agents/state.py
 backend/app/ingestion/chunker.py
 backend/app/ingestion/gdelt.py
@@ -20,4 +21,5 @@ backend/signalhub.egg-info/requires.txt
 backend/signalhub.egg-info/top_level.txt
 tests/test_agent_graph.py
 tests/test_chunker.py
+tests/test_research_agent.py
 tests/test_schema.py

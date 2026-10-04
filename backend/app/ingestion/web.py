@@ -569,6 +569,18 @@ def _suggest_source_type(
     ):
         return "EVENT"
 
+    if any(
+        term in combined
+        for term in (
+            "about us",
+            "about-us",
+            "company profile",
+            "company overview",
+            "/company/",
+        )
+    ):
+        return "COMPANY"
+
     return parent_source_type
 
 
