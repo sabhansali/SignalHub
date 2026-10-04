@@ -1,0 +1,17 @@
+fastapi<1,>=0.115
+uvicorn[standard]<1,>=0.34
+sqlalchemy<3,>=2.0
+pydantic<3,>=2.9
+pydantic-settings<3,>=2.6
+psycopg[binary]<4,>=3.2
+lancedb<0.31,>=0.30
+sentence-transformers<6,>=5
+langgraph<2,>=0.2
+beautifulsoup4<5,>=4.13
+pymupdf<2,>=1.27
+httpx<1,>=0.28
+python-dotenv<2,>=1.1
+
+[dev]
+pytest<9,>=8.3
+ruff<1,>=0.13

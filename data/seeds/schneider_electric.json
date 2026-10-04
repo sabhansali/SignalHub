@@ -1,0 +1,33 @@
+{
+  "name": "Schneider Electric",
+  "industry": "Manufacturing",
+  "market": "India",
+  "tier": "TIER_1",
+  "description": "Seed account for the first end-to-end SignalHub intelligence run.",
+  "sources": [
+    {
+      "type": "COMPANY",
+      "url": "https://www.se.com/ww/en/about-us/"
+    },
+    {
+      "type": "PRESS_RELEASE",
+      "url": "https://www.se.com/in/en/about-us/newsroom/news/"
+    },
+    {
+      "type": "INVESTOR",
+      "url": "https://www.se.com/ww/en/about-us/investor-relations/"
+    },
+    {
+      "type": "ANNUAL_REPORT",
+      "url": "https://www.se.com/in/en/download/document/2025-URD/"
+    },
+    {
+      "type": "COMPANY",
+      "url": "https://www.se.com/in/en/about-us/newsroom/"
+    },
+    {
+      "type": "CAREERS",
+      "url": "https://careers.se.com/india"
+    }
+  ]
+}
